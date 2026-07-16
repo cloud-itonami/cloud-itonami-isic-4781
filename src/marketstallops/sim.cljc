@@ -1,0 +1,89 @@
+(ns marketstallops.sim
+  "Demo driver -- `clojure -M:run`. Walks a clean sales-record logging
+  request through intake -> advise -> govern -> decide -> approval ->
+  commit at phase 1 (assisted-logging, always approval), then re-runs the
+  same op at phase 3 (supervised-auto, clean + high confidence ->
+  auto-commit), then a stall-operation-scheduling request and a low-cost
+  supply-order coordination (both auto-commit clean at phase 3), then a
+  high-cost supply-order (ALWAYS escalates regardless of phase), then a
+  compliance-concern flag (ALWAYS escalates, at any phase -- approve,
+  then commit), then HARD-hold scenarios: an unregistered stall, a stall
+  registered but not yet verified, a proposal whose own `:effect` is not
+  `:propose`, and a proposal that has drifted into the
+  permanently-excluded food-safety-clearance/age-verification-override
+  scope."
+  (:require [langgraph.graph :as g]
+            [marketstallops.advisor :as advisor]
+            [marketstallops.store :as store]
+            [marketstallops.operation :as op]))
+
+(defn- exec-op [actor tid request context]
+  (g/run* actor {:request request :context context} {:thread-id tid}))
+
+(defn- approve! [actor tid]
+  (g/run* actor {:approval {:status :approved :by "market-stall-coordinator-1"}} {:thread-id tid :resume? true}))
+
+(defn -main [& _]
+  (let [db (store/seed-db)
+        coordinator-phase-1 {:actor-id "coord-1" :actor-role :market-stall-coordinator :phase 1}
+        coordinator-phase-3 {:actor-id "coord-1" :actor-role :market-stall-coordinator :phase 3}
+        actor (op/build db)]
+
+    (println "== log-sales-record stall-1 (phase 1, escalates -- human approves) ==")
+    (let [r (exec-op actor "t1" {:op :log-sales-record :stall-id "stall-1"
+                                  :patch {:units-sold 24 :item "grilled skewers" :units-returned 1}} coordinator-phase-1)]
+      (println r)
+      (println "-- human market-stall coordinator approves --")
+      (println (approve! actor "t1")))
+
+    (println "\n== log-sales-record stall-1 (phase 3, clean -- auto-commits) ==")
+    (println (exec-op actor "t2" {:op :log-sales-record :stall-id "stall-1"
+                                  :patch {:units-sold 18 :item "iced tea 500ml" :units-returned 0}} coordinator-phase-3))
+
+    (println "\n== schedule-stall-operation stall-1 (phase 3, clean -- auto-commits) ==")
+    (println (exec-op actor "t3" {:op :schedule-stall-operation :stall-id "stall-1"
+                                  :patch {:pitch "riverside-market-lot-4" :date "2026-07-20" :window "10:00-18:00"}} coordinator-phase-3))
+
+    (println "\n== coordinate-supply-order stall-1, low cost (phase 3, clean -- auto-commits) ==")
+    (println (exec-op actor "t4" {:op :coordinate-supply-order :stall-id "stall-1"
+                                  :patch {:item "napkins and packaging" :quantity 500 :estimated-cost 85.0}} coordinator-phase-3))
+
+    (println "\n== coordinate-supply-order stall-1, HIGH cost (ALWAYS escalates, even at phase 3) ==")
+    (let [r (exec-op actor "t5" {:op :coordinate-supply-order :stall-id "stall-1"
+                                 :patch {:item "bulk tobacco product restock" :quantity 1 :estimated-cost 3200.0}} coordinator-phase-3)]
+      (println r)
+      (println "-- human market-stall coordinator reviews & approves --")
+      (println (approve! actor "t5")))
+
+    (println "\n== flag-compliance-concern stall-1 (ALWAYS escalates, even at phase 3) ==")
+    (let [r (exec-op actor "t6" {:op :flag-compliance-concern :stall-id "stall-1"
+                                 :patch {:concern "customer buying tobacco declined to present ID after vendor request, suspected underage purchase attempt" :confidence 0.92}} coordinator-phase-3)]
+      (println r)
+      (println "-- human market-stall coordinator reviews & approves --")
+      (println (approve! actor "t6")))
+
+    (println "\n== log-sales-record stall-99 (unregistered stall -> HARD hold) ==")
+    (println (exec-op actor "t7" {:op :log-sales-record :stall-id "stall-99"
+                                  :patch {:units-sold 0 :item "unknown"}} coordinator-phase-3))
+
+    (println "\n== log-sales-record stall-3 (registered but unverified -> HARD hold) ==")
+    (println (exec-op actor "t8" {:op :log-sales-record :stall-id "stall-3"
+                                  :patch {:units-sold 10 :item "grilled corn"}} coordinator-phase-3))
+
+    (println "\n== schedule-stall-operation stall-1, advisor attempts direct actuation (:effect :commit) -> HARD hold ==")
+    (let [actor-direct (op/build db {:advisor (reify advisor/Advisor
+                                                (-advise [_ _ req]
+                                                  (assoc (advisor/infer nil req) :effect :commit)))})]
+      (println (exec-op actor-direct "t9" {:op :schedule-stall-operation :stall-id "stall-1"
+                                           :patch {:pitch "night-bazaar-row-2" :date "2026-07-22"}} coordinator-phase-3)))
+
+    (println "\n== log-sales-record stall-1, advisor drifts into food-safety-clearance/age-verification-override scope -> HARD hold, permanent ==")
+    (println (exec-op actor "t10" {:op :log-sales-record :stall-id "stall-1"
+                                   :out-of-scope? true
+                                   :patch {}} coordinator-phase-3))
+
+    (println "\n== audit ledger ==")
+    (doseq [f (store/ledger db)] (println f))
+
+    (println "\n== committed coordination log ==")
+    (doseq [r (store/coordination-log db)] (println r))))

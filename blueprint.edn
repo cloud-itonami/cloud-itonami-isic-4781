@@ -1,0 +1,13 @@
+[{:itonami.blueprint/id "cloud-itonami-isic-4781"
+  :itonami.blueprint/name "Retail Sale via Stalls and Markets of Food, Beverages and Tobacco Products"
+  :itonami.blueprint/isic-rev4 "4781"
+  :itonami.blueprint/domain :retail/stall-market-food-beverage-tobacco
+  :itonami.blueprint/license "AGPL-3.0-or-later"
+  :itonami.blueprint/social-impact [:food-safety-integrity :age-verification-integrity :local-economy]
+  :itonami.blueprint/governor :market-stall-retail-governor
+  :itonami.blueprint/robotics true
+  :itonami.blueprint/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+  :itonami.blueprint/optional-technologies []
+  :itonami.blueprint/status :public-oss
+  :itonami.blueprint/maturity :implemented
+  :db/id -1}]
