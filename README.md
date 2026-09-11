@@ -52,11 +52,11 @@ clojure -M:run
 
 ## Test suite
 
-- `test/marketstallops/governor_test.clj` — unit tests of governor hard checks, scope exclusion, structured-field violations, and a dedicated regression test asserting the default mock-advisor proposals never self-trip scope-exclusion
-- `test/marketstallops/advisor_test.clj` — advisor proposal shape and consistency
-- `test/marketstallops/phase_test.clj` — rollout phase logic
-- `test/marketstallops/governor_contract_test.clj` — full graph integration, audit trail
-- `test/marketstallops/store_contract_test.clj` — Store protocol and MemStore implementation
+- `test/marketstallops/governor_test.cljk` — unit tests of governor hard checks, scope exclusion, structured-field violations, and a dedicated regression test asserting the default mock-advisor proposals never self-trip scope-exclusion
+- `test/marketstallops/advisor_test.cljk` — advisor proposal shape and consistency
+- `test/marketstallops/phase_test.cljk` — rollout phase logic
+- `test/marketstallops/governor_contract_test.cljk` — full graph integration, audit trail
+- `test/marketstallops/store_contract_test.cljk` — Store protocol and MemStore implementation
 
 ## Modules
 
